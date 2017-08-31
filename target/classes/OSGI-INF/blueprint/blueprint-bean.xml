@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<blueprint 
+  xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0" 
+  xmlns:cm="http://aries.apache.org/blueprint/xmlns/blueprint-cm/v1.1.0" 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+  xsi:schemaLocation="http://www.osgi.org/xmlns/blueprint/v1.0.0 https://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd          
+  http://camel.apache.org/schema/blueprint http://camel.apache.org/schema/blueprint/camel-blueprint.xsd          
+  http://aries.apache.org/blueprint/xmlns/blueprint-cm/v1.1.0 http://aries.apache.org/schemas/blueprint-cm/blueprint-cm-1.1.0.xsd">
+
+<!-- our custom class is this one -->
+  <bean class="test.MyJmsBinding" id="myJmsBinding"/>
+
+  <bean class="org.apache.activemq.RedeliveryPolicy" id="redeliveryPolicy">
+    <property name="maximumRedeliveries" value="0"/>
+  </bean>
+
+  <bean class="org.apache.activemq.ActiveMQConnectionFactory" id="jmsConnectionFactory">
+    <argument value="tcp://localhost:61616"/>
+    <property name="userName" value="admin"/>
+    <property name="password" value="admin"/>
+  </bean>
+  
+  <bean class="org.apache.camel.component.jms.JmsConfiguration" id="jmsConfig">
+    <property name="connectionFactory" ref="jmsConnectionFactory"/>
+  </bean>
+  
+  <!-- Config the jms that our manually configured endpint refers to-->
+  <bean class="org.apache.camel.component.jms.JmsComponent" id="jms">
+    <property name="configuration" ref="jmsConfig"/>
+  </bean>
+  
+  <!-- we are instantiating the endpoint explicitely as a bean, instead of letting the camel component doing it for us -->
+  <bean class="org.apache.camel.component.jms.JmsEndpoint" id="specialendpoint">
+    <!-- uri -->
+    <argument value="jms:queue:bar"/>
+    <!-- component -->
+    <argument ref="jms"/>
+    <!-- destinationName -->
+    <argument value="bar"/>
+    <!-- pubSubDomain -->
+    <argument value="false"/>
+    <!-- configuration -->
+    <argument ref="jmsConfig"/>
+    <!-- inject our custom behavior here -->
+    <property name="binding" ref="myJmsBinding"/>
+  </bean>
+  
+  <camelContext id="blueprint-bean-context" xmlns="http://camel.apache.org/schema/blueprint">
+    <route id="timerToLog">
+      <from uri="timer:foo?period=5000"/>
+      <setBody>
+        <simple>whatever</simple>
+      </setBody>
+      <log message="The message contains ${body}"/>
+      <!-- here we use the special endpoint -->
+      <to uri="ref:specialendpoint"/>
+    </route>
+  </camelContext>
+
+</blueprint>
